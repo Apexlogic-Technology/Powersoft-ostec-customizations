@@ -7,6 +7,37 @@ def before_insert(self, method=None):
 	copy_multi_year_data_from_quotation(self)
 
 
+def _find_source_quotation(self):
+	"""
+	Robustly detect the source Quotation name from a newly created Sales Order.
+	Tries multiple field names to remain compatible across ERPNext versions.
+	Returns the Quotation name (string) or None if not found.
+	"""
+	# Common field names used across ERPNext versions to link SO Items back to their source Quotation
+	candidate_fields = [
+		# v13/v14/v15 standard: prevdoc_docname set when doctype is Quotation
+		("prevdoc_doctype", "prevdoc_docname"),
+	]
+
+	for doctype_field, name_field in candidate_fields:
+		for item in self.items:
+			doctype_val = getattr(item, doctype_field, None)
+			name_val = getattr(item, name_field, None)
+			if doctype_val == "Quotation" and name_val:
+				if frappe.db.exists("Quotation", name_val):
+					return name_val
+
+	# Fallback: check any field on the SO item that directly holds a Quotation name
+	fallback_fields = ["quotation", "against_quotation", "quotation_name"]
+	for item in self.items:
+		for field in fallback_fields:
+			val = getattr(item, field, None)
+			if val and frappe.db.exists("Quotation", val):
+				return val
+
+	return None
+
+
 def copy_multi_year_data_from_quotation(self):
 	"""
 	When a Sales Order is created from a License Renewal Quotation, carry forward:
@@ -14,12 +45,7 @@ def copy_multi_year_data_from_quotation(self):
 	  - custom_license_renewal_items (full child table)
 	  - Year 2 and Year 3 totals, taxes, and grand totals
 	"""
-	# Identify the source Quotation via the items' prevdoc link
-	quotation_name = None
-	for item in self.items:
-		if getattr(item, "prevdoc_doctype", None) == "Quotation" and getattr(item, "prevdoc_docname", None):
-			quotation_name = item.prevdoc_docname
-			break
+	quotation_name = _find_source_quotation(self)
 
 	if not quotation_name:
 		return
