@@ -18,16 +18,19 @@ def before_save(self, method=None):
 	# will carry the same values and ERPNext's calculate_taxes_and_totals should produce
 	# the same result. This block is kept as a final guard against any residual drift.
 	precision = get_currency_precision()
+	# conversion_rate converts document currency -> company base currency (e.g. USD -> GHS)
+	conversion_rate = flt(self.conversion_rate) if flt(self.conversion_rate) > 0 else 1.0
 	ch_tab_name = get_items_table_name(self)
 	if ch_tab_name:
 		# Sum already-rounded amounts — result is exact
 		correct_total = flt(sum(flt(row.amount) for row in self.get(ch_tab_name, [])), precision)
 
-		# Override all total fields with the correct amount
+		# Document-currency totals
 		self.total = correct_total
 		self.net_total = correct_total
-		self.base_total = correct_total
-		self.base_net_total = correct_total
+		# Base-currency totals (company currency) — apply conversion rate
+		self.base_total = flt(correct_total * conversion_rate, precision)
+		self.base_net_total = flt(correct_total * conversion_rate, precision)
 
 		# Recalculate taxes based on correct total
 		total_tax = 0
@@ -40,21 +43,25 @@ def before_save(self, method=None):
 				tax_amount = flt((correct_total * flt(tax.rate)) / 100, precision)
 
 			tax.tax_amount = tax_amount
+			tax.base_tax_amount = flt(tax_amount * conversion_rate, precision)
 			tax.total = flt(total_with_tax + tax_amount, precision)
+			tax.base_total = flt(tax.total * conversion_rate, precision)
 			total_tax = flt(total_tax + tax_amount, precision)
 			total_with_tax = tax.total
 
 		# Set the correct tax totals
-		self.base_total_taxes_and_charges = total_tax
 		self.total_taxes_and_charges = total_tax
+		self.base_total_taxes_and_charges = flt(total_tax * conversion_rate, precision)
 
-		# Set the correct grand total
+		# Set the correct grand total (document currency)
 		grand = flt(correct_total + total_tax, precision)
-		self.base_grand_total = grand
 		self.grand_total = grand
 		self.rounded_total = flt(round(grand, 0), 0)
-		self.base_rounded_total = flt(round(grand, 0), 0)
+		# Set the correct grand total (base/company currency)
+		self.base_grand_total = flt(grand * conversion_rate, precision)
+		self.base_rounded_total = flt(round(grand * conversion_rate, 0), 0)
 	# ===== END SAFETY NET =====
+
 	
 	calculate_custom_taxes_year_2(self)
 	calculate_custom_taxes_year_3(self)
