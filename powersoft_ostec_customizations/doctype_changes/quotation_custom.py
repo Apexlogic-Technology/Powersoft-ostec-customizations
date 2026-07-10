@@ -8,6 +8,11 @@ def get_currency_precision():
 	return precision if precision else 2
 
 
+def onload(self, method=None):
+	if getattr(self, "custom_quotation_type", None) == "License Renewal":
+		self.custom_grand_total_all_years = flt(self.grand_total) + flt(self.custom_grand_total_year_2) + flt(self.custom_grand_total_year_3)
+
+
 def before_save(self, method=None):
 	calcs(self)
 	copy_items_in_main_table(self)

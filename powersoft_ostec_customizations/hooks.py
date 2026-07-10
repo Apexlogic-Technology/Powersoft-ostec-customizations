@@ -132,6 +132,7 @@ doc_events = {
         "on_submit": "powersoft_ostec_customizations.doctype_changes.supplier_quotation_custom.on_submit",
     },
     "Quotation": {
+        "onload": "powersoft_ostec_customizations.doctype_changes.quotation_custom.onload",
         "before_save": "powersoft_ostec_customizations.doctype_changes.quotation_custom.before_save",
         "validate": "powersoft_ostec_customizations.doctype_changes.quotation_custom.validate",
         "on_submit": "powersoft_ostec_customizations.doctype_changes.quotation_custom.on_submit",

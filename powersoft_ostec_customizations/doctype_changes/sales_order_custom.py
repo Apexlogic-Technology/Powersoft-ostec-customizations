@@ -7,6 +7,9 @@ def onload(self, method=None):
 	if self.is_new():
 		copy_multi_year_data_from_quotation(self)
 
+	if getattr(self, "custom_quotation_type", None) == "License Renewal":
+		self.custom_grand_total_all_years = flt(self.grand_total) + flt(self.custom_grand_total_year_2) + flt(self.custom_grand_total_year_3)
+
 
 def before_insert(self, method=None):
 	"""before_save is the reliable hook; before_insert is kept for completeness but does not run copy."""
@@ -25,6 +28,9 @@ def before_save(self, method=None):
 		quotation_name = _find_source_quotation(self)
 		if quotation_name:
 			copy_multi_year_data_from_quotation(self)
+
+	if getattr(self, "custom_quotation_type", None) == "License Renewal":
+		self.custom_grand_total_all_years = flt(self.grand_total) + flt(self.custom_grand_total_year_2) + flt(self.custom_grand_total_year_3)
 
 
 def _find_source_quotation(self):
