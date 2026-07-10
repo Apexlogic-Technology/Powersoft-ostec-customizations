@@ -60,29 +60,6 @@ def copy_multi_year_data_from_sales_order(self):
 	self.custom_grand_total_year_2 = flt(sales_order.custom_grand_total_year_2)
 	self.custom_grand_total_year_3 = flt(sales_order.custom_grand_total_year_3)
 
-	# --- License Renewal Items child table ---
-	self.set("custom_license_renewal_items", [])
-	for row in sales_order.custom_license_renewal_items:
-		self.append("custom_license_renewal_items", {
-			"main_item_code": row.main_item_code,
-			"item_name": row.item_name,
-			"qty": row.qty,
-			"uom": row.uom,
-			"part_number": row.part_number,
-			"custom_serial_no": row.custom_serial_no,
-			"description": row.description,
-			"shipping": flt(row.shipping),
-			"fx": flt(row.fx),
-			"markup": flt(row.markup),
-			"clearing": flt(row.clearing),
-			"disti_quote": flt(row.disti_quote),
-			"disti_quote_total": flt(row.disti_quote_total),
-			"multiplier": flt(row.multiplier),
-			"rate": flt(row.rate),
-			"amount": flt(row.amount),
-			"year_total_2": flt(row.year_total_2),
-			"year_total_3": flt(row.year_total_3),
-		})
 
 	# --- Year 2 taxes child table ---
 	self.set("custom_sales_taxes_and_charges_year_2", [])
