@@ -36,6 +36,22 @@ function copy_multi_year_data_from_invoice(frm) {
 			frm.set_value("custom_grand_total_year_2", invoice.custom_grand_total_year_2);
 			frm.set_value("custom_grand_total_year_3", invoice.custom_grand_total_year_3);
 
+			// Calculate sum of Year 1 (grand_total), Year 2, and Year 3 grand totals
+			let total_all_years = flt(invoice.grand_total) + flt(invoice.custom_grand_total_year_2) + flt(invoice.custom_grand_total_year_3);
+			
+			frm.set_value("paid_amount", total_all_years);
+			frm.set_value("received_amount", total_all_years);
+
+			// Also update the allocated amount on the invoice reference line
+			if (frm.doc.references) {
+				for (let ref of frm.doc.references) {
+					if (ref.reference_doctype === "Sales Invoice" && ref.reference_name === sales_invoice) {
+						frappe.model.set_value(ref.doctype, ref.name, "allocated_amount", total_all_years);
+						break;
+					}
+				}
+			}
+
 			// Clear and copy Year 2 taxes
 			frm.clear_table("custom_sales_taxes_and_charges_year_2");
 			if (invoice.custom_sales_taxes_and_charges_year_2) {
