@@ -148,6 +148,12 @@ doc_events = {
         "before_insert": "powersoft_ostec_customizations.doctype_changes.sales_invoice_custom.before_insert",
         "before_save": "powersoft_ostec_customizations.doctype_changes.sales_invoice_custom.before_save",
     },
+    # Copy multi-year data from reference Sales Invoice when creating/saving a Payment Entry
+    "Payment Entry": {
+        "onload": "powersoft_ostec_customizations.doctype_changes.payment_entry_custom.onload",
+        "before_insert": "powersoft_ostec_customizations.doctype_changes.payment_entry_custom.before_insert",
+        "before_save": "powersoft_ostec_customizations.doctype_changes.payment_entry_custom.before_save",
+    },
 }
 
 
