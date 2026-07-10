@@ -140,6 +140,7 @@ doc_events = {
         "onload": "powersoft_ostec_customizations.doctype_changes.sales_order_custom.onload",
         "before_insert": "powersoft_ostec_customizations.doctype_changes.sales_order_custom.before_insert",
         "before_save": "powersoft_ostec_customizations.doctype_changes.sales_order_custom.before_save",
+        "after_save": "powersoft_ostec_customizations.doctype_changes.sales_order_custom.after_save",
     },
     # Copy multi-year license renewal data from the Sales Order into the Sales Invoice on creation
     "Sales Invoice": {

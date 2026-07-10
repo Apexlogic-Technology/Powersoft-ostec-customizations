@@ -49,6 +49,51 @@ def before_save(self, method=None):
 			copy_multi_year_data_from_quotation(self)
 
 
+def after_save(self, method=None):
+	"""
+	DIAGNOSTIC after_save — query database directly to check if rows exist.
+	"""
+	# Query child table directly from database
+	year_2_db_rows = frappe.db.get_all(
+		"Sales Taxes and Charges",
+		filters={
+			"parent": self.name,
+			"parenttype": "Sales Order",
+			"parentfield": "custom_sales_taxes_and_charges_year_2"
+		},
+		fields=["name", "description", "tax_amount"]
+	)
+	year_3_db_rows = frappe.db.get_all(
+		"Sales Taxes and Charges",
+		filters={
+			"parent": self.name,
+			"parenttype": "Sales Order",
+			"parentfield": "custom_sales_taxes_and_charges_year_3"
+		},
+		fields=["name", "description", "tax_amount"]
+	)
+	item_db_rows = frappe.db.get_all(
+		"License Renewal Items",
+		filters={
+			"parent": self.name,
+			"parenttype": "Sales Order",
+			"parentfield": "custom_license_renewal_items"
+		},
+		fields=["name", "item_name", "amount"]
+	)
+	frappe.msgprint(
+		f"<b>DIAGNOSTIC — after_save in database</b><br>"
+		f"Sales Order: {self.name}<br>"
+		f"DB License Items count: {len(item_db_rows)}<br>"
+		f"DB Year 2 Tax count: {len(year_2_db_rows)}<br>"
+		f"DB Year 3 Tax count: {len(year_3_db_rows)}<br>"
+		f"DB Year 2 Rows: {year_2_db_rows}<br>"
+		f"DB Year 3 Rows: {year_3_db_rows}",
+		title="Database Save Verification",
+		indicator="green"
+	)
+
+
 def _find_source_quotation(self):
 	"""
 	Robustly detect the source Quotation name from a newly created Sales Order.
