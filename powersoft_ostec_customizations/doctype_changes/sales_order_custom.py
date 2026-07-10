@@ -4,7 +4,6 @@ from frappe.utils import flt
 
 def before_insert(self, method=None):
 	"""Copy multi-year license renewal data from the source Quotation when a Sales Order is created."""
-	frappe.throw("before_insert is running!")
 	copy_multi_year_data_from_quotation(self)
 
 
@@ -49,16 +48,22 @@ def copy_multi_year_data_from_quotation(self):
 	quotation_name = _find_source_quotation(self)
 
 	if not quotation_name:
-		return
+		items_debug = []
+		for item in self.items:
+			item_dict = item.as_dict()
+			clean_dict = {k: v for k, v in item_dict.items() if v is not None}
+			items_debug.append(clean_dict)
+		frappe.throw(f"Debug: Quotation not found. Items fields: {items_debug}")
 
 	try:
 		quotation = frappe.get_doc("Quotation", quotation_name)
 	except frappe.DoesNotExistError:
-		return
+		frappe.throw(f"Debug: Quotation '{quotation_name}' does not exist.")
 
 	# Only carry forward if this is a License Renewal quotation
-	if getattr(quotation, "custom_quotation_type", None) != "License Renewal":
-		return
+	q_type = getattr(quotation, "custom_quotation_type", None)
+	if q_type != "License Renewal":
+		frappe.throw(f"Debug: Quotation '{quotation_name}' has type '{q_type}', expected 'License Renewal'")
 
 	# --- Header Fields ---
 	self.custom_quotation_type = quotation.custom_quotation_type

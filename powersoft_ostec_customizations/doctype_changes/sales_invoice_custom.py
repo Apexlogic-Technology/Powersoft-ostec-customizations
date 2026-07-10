@@ -4,7 +4,6 @@ from frappe.utils import flt
 
 def before_insert(self, method=None):
 	"""Copy multi-year license renewal data from the source Sales Order when a Sales Invoice is created."""
-	frappe.throw("Sales Invoice before_insert is running!")
 	copy_multi_year_data_from_sales_order(self)
 
 
@@ -24,16 +23,22 @@ def copy_multi_year_data_from_sales_order(self):
 			break
 
 	if not sales_order_name:
-		return
+		items_debug = []
+		for item in self.items:
+			item_dict = item.as_dict()
+			clean_dict = {k: v for k, v in item_dict.items() if v is not None}
+			items_debug.append(clean_dict)
+		frappe.throw(f"Debug: Sales Order not found. Items fields: {items_debug}")
 
 	try:
 		sales_order = frappe.get_doc("Sales Order", sales_order_name)
 	except frappe.DoesNotExistError:
-		return
+		frappe.throw(f"Debug: Sales Order '{sales_order_name}' does not exist.")
 
 	# Only carry forward if this is a License Renewal
-	if getattr(sales_order, "custom_quotation_type", None) != "License Renewal":
-		return
+	so_type = getattr(sales_order, "custom_quotation_type", None)
+	if so_type != "License Renewal":
+		frappe.throw(f"Debug: Sales Order '{sales_order_name}' has type '{so_type}', expected 'License Renewal'")
 
 	# --- Header Fields ---
 	self.custom_quotation_type = sales_order.custom_quotation_type
