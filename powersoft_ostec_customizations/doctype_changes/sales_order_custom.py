@@ -102,7 +102,23 @@ def copy_multi_year_data_from_quotation(self):
 	if getattr(quotation, "custom_quotation_type", None) != "License Renewal":
 		return
 
-	# --- Header Fields ---
+	# --- DIAGNOSTIC: show what the quotation actually has ---
+	frappe.msgprint(
+		f"<b>DIAGNOSTIC — copy_multi_year_data_from_quotation</b><br>"
+		f"Quotation: {quotation_name}<br>"
+		f"custom_license_renewal_items rows: {len(quotation.custom_license_renewal_items)}<br>"
+		f"custom_sales_taxes_year_2 rows: {len(quotation.custom_sales_taxes_and_charges_year_2)}<br>"
+		f"custom_sales_taxes_year_3 rows: {len(quotation.custom_sales_taxes_and_charges_year_3)}<br>"
+		f"custom_total_year_2: {getattr(quotation, 'custom_total_year_2', 'MISSING')}<br>"
+		f"custom_total_year_3: {getattr(quotation, 'custom_total_year_3', 'MISSING')}<br>"
+		f"custom_grand_total_year_2: {getattr(quotation, 'custom_grand_total_year_2', 'MISSING')}<br>"
+		f"custom_grand_total_year_3: {getattr(quotation, 'custom_grand_total_year_3', 'MISSING')}",
+		title="Copy Function Debug",
+		indicator="orange"
+	)
+	# --- END DIAGNOSTIC ---
+
+
 	self.custom_quotation_type = quotation.custom_quotation_type
 	self.custom_total_year_2 = flt(quotation.custom_total_year_2)
 	self.custom_total_year_3 = flt(quotation.custom_total_year_3)
