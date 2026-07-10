@@ -15,13 +15,30 @@ def before_insert(self, method=None):
 
 def before_save(self, method=None):
 	"""
-	Copy multi-year license renewal data on first save of a new Sales Order.
-	This is the reliable hook — all prevdoc links on items are guaranteed to be
-	resolved by the time before_save fires, unlike before_insert.
-	Guarded so it only runs when the data has not been copied yet.
+	DIAGNOSTIC VERSION — remove after confirming fix works.
 	"""
 	if self.is_new() or not getattr(self, "custom_quotation_type", None):
-		copy_multi_year_data_from_quotation(self)
+		# Collect item link fields for diagnosis
+		item_info = []
+		for item in self.items[:3]:  # first 3 items only
+			item_info.append({
+				"prevdoc_doctype": getattr(item, "prevdoc_doctype", "—"),
+				"prevdoc_docname": getattr(item, "prevdoc_docname", "—"),
+				"against_quotation": getattr(item, "against_quotation", "—"),
+				"quotation": getattr(item, "quotation", "—"),
+			})
+		quotation_name = _find_source_quotation(self)
+		frappe.msgprint(
+			f"<b>DIAGNOSTIC — before_save on Sales Order</b><br>"
+			f"is_new={self.is_new()}<br>"
+			f"custom_quotation_type={getattr(self, 'custom_quotation_type', None)!r}<br>"
+			f"quotation_found={quotation_name!r}<br>"
+			f"item_links={item_info}",
+			title="Tax Copy Debug",
+			indicator="blue"
+		)
+		if quotation_name:
+			copy_multi_year_data_from_quotation(self)
 
 
 def _find_source_quotation(self):
