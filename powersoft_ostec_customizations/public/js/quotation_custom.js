@@ -10,6 +10,7 @@ frappe.ui.form.on("Quotation", {
                 get_n_set_items(frm);
             }
         }
+        toggle_totals(frm);
 	},
     currency(frm) {
         let ch_tab_name = get_items_table_name(frm)
@@ -19,6 +20,7 @@ frappe.ui.form.on("Quotation", {
     },
     custom_quotation_type(frm) {
         get_n_set_items(frm);
+        toggle_totals(frm);
     },
 	// Parent-level add/remove events for Standard Quotation Items
 	custom_standard_quotation_items_add(frm) {
@@ -188,3 +190,27 @@ function get_items_table_name(frm) {
     if (frm.doc.custom_quotation_type == "License Renewal"){ch_tab_name = "custom_license_renewal_items"}
     return ch_tab_name
 }
+
+function toggle_totals(frm) {
+    let is_renewal = (frm.doc.custom_quotation_type === "License Renewal");
+    
+    // Hide standard totals fields
+    let standard_fields = [
+        "total",
+        "grand_total",
+        "rounding_adjustment",
+        "rounded_total",
+        "in_words",
+        "disable_rounded_total"
+    ];
+    
+    for (let f of standard_fields) {
+        frm.toggle_display(f, !is_renewal);
+    }
+    
+    // Show/hide Year 1 custom fields
+    frm.toggle_display("custom_total_year_1", is_renewal);
+    frm.toggle_display("custom_total_taxes_and_charges_year_1", is_renewal);
+    frm.toggle_display("custom_grand_total_year_1", is_renewal);
+}
+

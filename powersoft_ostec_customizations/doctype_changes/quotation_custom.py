@@ -10,6 +10,9 @@ def get_currency_precision():
 
 def onload(self, method=None):
 	if getattr(self, "custom_quotation_type", None) == "License Renewal":
+		self.custom_total_year_1 = flt(self.total)
+		self.custom_total_taxes_and_charges_year_1 = flt(self.total_taxes_and_charges)
+		self.custom_grand_total_year_1 = flt(self.grand_total)
 		self.custom_grand_total_all_years = flt(self.grand_total) + flt(self.custom_grand_total_year_2) + flt(self.custom_grand_total_year_3)
 
 
@@ -21,6 +24,9 @@ def before_save(self, method=None):
 	_apply_totals_safety_net(self)
 	calculate_custom_taxes_year_2(self)
 	calculate_custom_taxes_year_3(self)
+	self.custom_total_year_1 = flt(self.total)
+	self.custom_total_taxes_and_charges_year_1 = flt(self.total_taxes_and_charges)
+	self.custom_grand_total_year_1 = flt(self.grand_total)
 	self.custom_grand_total_year_2 = flt(self.custom_total_year_2) + flt(self.custom_total_taxes_and_charges_year_2)
 	self.custom_grand_total_year_3 = flt(self.custom_total_year_3) + flt(self.custom_total_taxes_and_charges_year_3)
 	self.custom_grand_total_all_years = flt(self.grand_total) + flt(self.custom_grand_total_year_2) + flt(self.custom_grand_total_year_3)
@@ -36,6 +42,9 @@ def validate(self, method=None):
 	_apply_totals_safety_net(self)
 	calculate_custom_taxes_year_2(self)
 	calculate_custom_taxes_year_3(self)
+	self.custom_total_year_1 = flt(self.total)
+	self.custom_total_taxes_and_charges_year_1 = flt(self.total_taxes_and_charges)
+	self.custom_grand_total_year_1 = flt(self.grand_total)
 	self.custom_grand_total_year_2 = flt(self.custom_total_year_2) + flt(self.custom_total_taxes_and_charges_year_2)
 	self.custom_grand_total_year_3 = flt(self.custom_total_year_3) + flt(self.custom_total_taxes_and_charges_year_3)
 	self.custom_grand_total_all_years = flt(self.grand_total) + flt(self.custom_grand_total_year_2) + flt(self.custom_grand_total_year_3)
