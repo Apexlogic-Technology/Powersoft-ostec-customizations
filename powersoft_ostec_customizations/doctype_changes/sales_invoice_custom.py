@@ -61,6 +61,7 @@ def copy_multi_year_data_from_sales_order(self):
 		self.custom_total_taxes_and_charges_year_3 = flt(sales_order.custom_total_taxes_and_charges_year_3)
 		self.custom_grand_total_year_2 = flt(sales_order.custom_grand_total_year_2)
 		self.custom_grand_total_year_3 = flt(sales_order.custom_grand_total_year_3)
+		self.custom_grand_total_all_years = flt(sales_order.custom_grand_total_all_years)
 
 		# --- Year 2 taxes child table ---
 		self.set("custom_sales_taxes_and_charges_year_2", [])

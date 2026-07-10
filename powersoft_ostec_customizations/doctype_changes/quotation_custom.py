@@ -18,6 +18,7 @@ def before_save(self, method=None):
 	calculate_custom_taxes_year_3(self)
 	self.custom_grand_total_year_2 = flt(self.custom_total_year_2) + flt(self.custom_total_taxes_and_charges_year_2)
 	self.custom_grand_total_year_3 = flt(self.custom_total_year_3) + flt(self.custom_total_taxes_and_charges_year_3)
+	self.custom_grand_total_all_years = flt(self.grand_total) + flt(self.custom_grand_total_year_2) + flt(self.custom_grand_total_year_3)
 
 
 def validate(self, method=None):
@@ -32,6 +33,7 @@ def validate(self, method=None):
 	calculate_custom_taxes_year_3(self)
 	self.custom_grand_total_year_2 = flt(self.custom_total_year_2) + flt(self.custom_total_taxes_and_charges_year_2)
 	self.custom_grand_total_year_3 = flt(self.custom_total_year_3) + flt(self.custom_total_taxes_and_charges_year_3)
+	self.custom_grand_total_all_years = flt(self.grand_total) + flt(self.custom_grand_total_year_2) + flt(self.custom_grand_total_year_3)
 
 
 def on_submit(self, method=None):
