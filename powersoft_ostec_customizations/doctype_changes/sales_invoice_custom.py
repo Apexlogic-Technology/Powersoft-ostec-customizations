@@ -4,6 +4,7 @@ from frappe.utils import flt
 
 def before_insert(self, method=None):
 	"""Copy multi-year license renewal data from the source Sales Order when a Sales Invoice is created."""
+	frappe.throw("Sales Invoice before_insert is running!")
 	copy_multi_year_data_from_sales_order(self)
 
 
