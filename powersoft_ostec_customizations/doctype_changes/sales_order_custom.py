@@ -15,83 +15,15 @@ def before_insert(self, method=None):
 
 def before_save(self, method=None):
 	"""
-	DIAGNOSTIC VERSION — remove after confirming fix works.
+	Copy multi-year license renewal data on first save of a new Sales Order.
+	This is the reliable hook — all prevdoc links on items are guaranteed to be
+	resolved by the time before_save fires, unlike before_insert.
+	Guarded so it only runs when the data has not been copied yet.
 	"""
 	if self.is_new() or not getattr(self, "custom_quotation_type", None):
-		# Collect item link fields for diagnosis
-		item_info = []
-		for item in self.items[:3]:  # first 3 items only
-			item_info.append({
-				"prevdoc_doctype": getattr(item, "prevdoc_doctype", "—"),
-				"prevdoc_docname": getattr(item, "prevdoc_docname", "—"),
-				"against_quotation": getattr(item, "against_quotation", "—"),
-				"quotation": getattr(item, "quotation", "—"),
-			})
 		quotation_name = _find_source_quotation(self)
-		# Also peek at the quotation type if found
-		q_type = None
-		if quotation_name:
-			try:
-				q_type = frappe.db.get_value("Quotation", quotation_name, "custom_quotation_type")
-			except Exception:
-				q_type = "ERROR reading type"
-		frappe.msgprint(
-			f"<b>DIAGNOSTIC — before_save on Sales Order</b><br>"
-			f"is_new={self.is_new()}<br>"
-			f"so.custom_quotation_type={getattr(self, 'custom_quotation_type', None)!r}<br>"
-			f"quotation_found={quotation_name!r}<br>"
-			f"quotation.custom_quotation_type={q_type!r}<br>"
-			f"item_links={item_info}",
-			title="Tax Copy Debug",
-			indicator="blue"
-		)
 		if quotation_name:
 			copy_multi_year_data_from_quotation(self)
-
-
-def after_save(self, method=None):
-	"""
-	DIAGNOSTIC after_save — query database directly to check if rows exist.
-	"""
-	# Query child table directly from database
-	year_2_db_rows = frappe.db.get_all(
-		"Sales Taxes and Charges",
-		filters={
-			"parent": self.name,
-			"parenttype": "Sales Order",
-			"parentfield": "custom_sales_taxes_and_charges_year_2"
-		},
-		fields=["name", "description", "tax_amount"]
-	)
-	year_3_db_rows = frappe.db.get_all(
-		"Sales Taxes and Charges",
-		filters={
-			"parent": self.name,
-			"parenttype": "Sales Order",
-			"parentfield": "custom_sales_taxes_and_charges_year_3"
-		},
-		fields=["name", "description", "tax_amount"]
-	)
-	item_db_rows = frappe.db.get_all(
-		"License Renewal Items",
-		filters={
-			"parent": self.name,
-			"parenttype": "Sales Order",
-			"parentfield": "custom_license_renewal_items"
-		},
-		fields=["name", "item_name", "amount"]
-	)
-	frappe.msgprint(
-		f"<b>DIAGNOSTIC — after_save in database</b><br>"
-		f"Sales Order: {self.name}<br>"
-		f"DB License Items count: {len(item_db_rows)}<br>"
-		f"DB Year 2 Tax count: {len(year_2_db_rows)}<br>"
-		f"DB Year 3 Tax count: {len(year_3_db_rows)}<br>"
-		f"DB Year 2 Rows: {year_2_db_rows}<br>"
-		f"DB Year 3 Rows: {year_3_db_rows}",
-		title="Database Save Verification",
-		indicator="green"
-	)
 
 
 def _find_source_quotation(self):
@@ -146,23 +78,6 @@ def copy_multi_year_data_from_quotation(self):
 	# Only carry forward if this is a License Renewal quotation
 	if getattr(quotation, "custom_quotation_type", None) != "License Renewal":
 		return
-
-	# --- DIAGNOSTIC: show what the quotation actually has ---
-	frappe.msgprint(
-		f"<b>DIAGNOSTIC — copy_multi_year_data_from_quotation</b><br>"
-		f"Quotation: {quotation_name}<br>"
-		f"custom_license_renewal_items rows: {len(quotation.custom_license_renewal_items)}<br>"
-		f"custom_sales_taxes_year_2 rows: {len(quotation.custom_sales_taxes_and_charges_year_2)}<br>"
-		f"custom_sales_taxes_year_3 rows: {len(quotation.custom_sales_taxes_and_charges_year_3)}<br>"
-		f"custom_total_year_2: {getattr(quotation, 'custom_total_year_2', 'MISSING')}<br>"
-		f"custom_total_year_3: {getattr(quotation, 'custom_total_year_3', 'MISSING')}<br>"
-		f"custom_grand_total_year_2: {getattr(quotation, 'custom_grand_total_year_2', 'MISSING')}<br>"
-		f"custom_grand_total_year_3: {getattr(quotation, 'custom_grand_total_year_3', 'MISSING')}",
-		title="Copy Function Debug",
-		indicator="orange"
-	)
-	# --- END DIAGNOSTIC ---
-
 
 	self.custom_quotation_type = quotation.custom_quotation_type
 	self.custom_total_year_2 = flt(quotation.custom_total_year_2)
