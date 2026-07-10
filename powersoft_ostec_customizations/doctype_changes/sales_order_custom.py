@@ -28,11 +28,19 @@ def before_save(self, method=None):
 				"quotation": getattr(item, "quotation", "—"),
 			})
 		quotation_name = _find_source_quotation(self)
+		# Also peek at the quotation type if found
+		q_type = None
+		if quotation_name:
+			try:
+				q_type = frappe.db.get_value("Quotation", quotation_name, "custom_quotation_type")
+			except Exception:
+				q_type = "ERROR reading type"
 		frappe.msgprint(
 			f"<b>DIAGNOSTIC — before_save on Sales Order</b><br>"
 			f"is_new={self.is_new()}<br>"
-			f"custom_quotation_type={getattr(self, 'custom_quotation_type', None)!r}<br>"
+			f"so.custom_quotation_type={getattr(self, 'custom_quotation_type', None)!r}<br>"
 			f"quotation_found={quotation_name!r}<br>"
+			f"quotation.custom_quotation_type={q_type!r}<br>"
 			f"item_links={item_info}",
 			title="Tax Copy Debug",
 			indicator="blue"
@@ -44,24 +52,25 @@ def before_save(self, method=None):
 def _find_source_quotation(self):
 	"""
 	Robustly detect the source Quotation name from a newly created Sales Order.
-	Tries multiple field names to remain compatible across ERPNext versions.
+	ERPNext sets prevdoc_docname on SO items but may leave prevdoc_doctype empty.
+	We verify by checking DB existence directly instead of relying on prevdoc_doctype.
 	Returns the Quotation name (string) or None if not found.
 	"""
-	# Common field names used across ERPNext versions to link SO Items back to their source Quotation
-	candidate_fields = [
-		# v13/v14/v15 standard: prevdoc_docname set when doctype is Quotation
-		("prevdoc_doctype", "prevdoc_docname"),
-	]
+	# Primary: prevdoc_docname — present in all ERPNext versions, verified via DB
+	for item in self.items:
+		val = getattr(item, "prevdoc_docname", None)
+		if val and frappe.db.exists("Quotation", val):
+			return val
 
-	for doctype_field, name_field in candidate_fields:
-		for item in self.items:
-			doctype_val = getattr(item, doctype_field, None)
-			name_val = getattr(item, name_field, None)
-			if doctype_val == "Quotation" and name_val:
-				if frappe.db.exists("Quotation", name_val):
-					return name_val
+	# Secondary: explicit prevdoc_doctype + prevdoc_docname pairing
+	for item in self.items:
+		doctype_val = getattr(item, "prevdoc_doctype", None)
+		name_val = getattr(item, "prevdoc_docname", None)
+		if doctype_val == "Quotation" and name_val:
+			if frappe.db.exists("Quotation", name_val):
+				return name_val
 
-	# Fallback: check any field on the SO item that directly holds a Quotation name
+	# Tertiary: other field names used in some ERPNext versions
 	fallback_fields = ["quotation", "against_quotation", "quotation_name"]
 	for item in self.items:
 		for field in fallback_fields:
