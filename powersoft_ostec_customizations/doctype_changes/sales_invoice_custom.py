@@ -2,9 +2,26 @@ import frappe
 from frappe.utils import flt
 
 
+def onload(self, method=None):
+	"""Copy multi-year license renewal data when the Sales Invoice is loaded (newly mapped document)."""
+	if self.is_new():
+		copy_multi_year_data_from_sales_order(self)
+
+
 def before_insert(self, method=None):
 	"""Copy multi-year license renewal data from the source Sales Order when a Sales Invoice is created."""
 	copy_multi_year_data_from_sales_order(self)
+
+
+def before_save(self, method=None):
+	"""
+	Copy multi-year license renewal data on first save of a new Sales Invoice.
+	This is the reliable hook — all sales_order links on items are guaranteed to be
+	resolved by the time before_save fires, unlike before_insert.
+	Guarded so it only runs when the data has not been copied yet.
+	"""
+	if self.is_new() or not getattr(self, "custom_quotation_type", None):
+		copy_multi_year_data_from_sales_order(self)
 
 
 def copy_multi_year_data_from_sales_order(self):
@@ -23,22 +40,16 @@ def copy_multi_year_data_from_sales_order(self):
 			break
 
 	if not sales_order_name:
-		items_debug = []
-		for item in self.items:
-			item_dict = item.as_dict()
-			clean_dict = {k: v for k, v in item_dict.items() if v is not None}
-			items_debug.append(clean_dict)
-		frappe.throw(f"Debug: Sales Order not found. Items fields: {items_debug}")
+		return
 
 	try:
 		sales_order = frappe.get_doc("Sales Order", sales_order_name)
 	except frappe.DoesNotExistError:
-		frappe.throw(f"Debug: Sales Order '{sales_order_name}' does not exist.")
+		return
 
 	# Only carry forward if this is a License Renewal
-	so_type = getattr(sales_order, "custom_quotation_type", None)
-	if so_type != "License Renewal":
-		frappe.throw(f"Debug: Sales Order '{sales_order_name}' has type '{so_type}', expected 'License Renewal'")
+	if getattr(sales_order, "custom_quotation_type", None) != "License Renewal":
+		return
 
 	# --- Header Fields ---
 	self.custom_quotation_type = sales_order.custom_quotation_type

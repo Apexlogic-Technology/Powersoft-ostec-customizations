@@ -137,11 +137,15 @@ doc_events = {
     },
     # Copy multi-year license renewal data from the Quotation into the Sales Order on creation
     "Sales Order": {
+        "onload": "powersoft_ostec_customizations.doctype_changes.sales_order_custom.onload",
         "before_insert": "powersoft_ostec_customizations.doctype_changes.sales_order_custom.before_insert",
+        "before_save": "powersoft_ostec_customizations.doctype_changes.sales_order_custom.before_save",
     },
     # Copy multi-year license renewal data from the Sales Order into the Sales Invoice on creation
     "Sales Invoice": {
+        "onload": "powersoft_ostec_customizations.doctype_changes.sales_invoice_custom.onload",
         "before_insert": "powersoft_ostec_customizations.doctype_changes.sales_invoice_custom.before_insert",
+        "before_save": "powersoft_ostec_customizations.doctype_changes.sales_invoice_custom.before_save",
     },
 }
 

@@ -2,9 +2,26 @@ import frappe
 from frappe.utils import flt
 
 
+def onload(self, method=None):
+	"""Copy multi-year license renewal data when the Sales Order is loaded (newly mapped document)."""
+	if self.is_new():
+		copy_multi_year_data_from_quotation(self)
+
+
 def before_insert(self, method=None):
 	"""Copy multi-year license renewal data from the source Quotation when a Sales Order is created."""
 	copy_multi_year_data_from_quotation(self)
+
+
+def before_save(self, method=None):
+	"""
+	Copy multi-year license renewal data on first save of a new Sales Order.
+	This is the reliable hook — all prevdoc links on items are guaranteed to be
+	resolved by the time before_save fires, unlike before_insert.
+	Guarded so it only runs when the data has not been copied yet.
+	"""
+	if self.is_new() or not getattr(self, "custom_quotation_type", None):
+		copy_multi_year_data_from_quotation(self)
 
 
 def _find_source_quotation(self):
@@ -48,22 +65,16 @@ def copy_multi_year_data_from_quotation(self):
 	quotation_name = _find_source_quotation(self)
 
 	if not quotation_name:
-		items_debug = []
-		for item in self.items:
-			item_dict = item.as_dict()
-			clean_dict = {k: v for k, v in item_dict.items() if v is not None}
-			items_debug.append(clean_dict)
-		frappe.throw(f"Debug: Quotation not found. Items fields: {items_debug}")
+		return
 
 	try:
 		quotation = frappe.get_doc("Quotation", quotation_name)
 	except frappe.DoesNotExistError:
-		frappe.throw(f"Debug: Quotation '{quotation_name}' does not exist.")
+		return
 
 	# Only carry forward if this is a License Renewal quotation
-	q_type = getattr(quotation, "custom_quotation_type", None)
-	if q_type != "License Renewal":
-		frappe.throw(f"Debug: Quotation '{quotation_name}' has type '{q_type}', expected 'License Renewal'")
+	if getattr(quotation, "custom_quotation_type", None) != "License Renewal":
+		return
 
 	# --- Header Fields ---
 	self.custom_quotation_type = quotation.custom_quotation_type
