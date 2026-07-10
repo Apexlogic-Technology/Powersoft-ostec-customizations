@@ -16,9 +16,10 @@ def before_insert(self, method=None):
 def before_save(self, method=None):
 	"""
 	Copy multi-year data on first save of a new Payment Entry.
-	Guarded so it only runs when the data has not been copied yet.
+	Guarded so it only runs when the doc is new and the totals are not yet populated,
+	preventing redundant re-copy on subsequent saves.
 	"""
-	if self.is_new() or not getattr(self, "custom_quotation_type", None):
+	if self.is_new() and not flt(self.custom_grand_total_year_2) and not flt(self.custom_grand_total_year_3):
 		copy_multi_year_data_from_sales_invoice(self)
 
 
