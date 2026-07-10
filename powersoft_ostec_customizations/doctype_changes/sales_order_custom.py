@@ -9,8 +9,8 @@ def onload(self, method=None):
 
 
 def before_insert(self, method=None):
-	"""Copy multi-year license renewal data from the source Quotation when a Sales Order is created."""
-	copy_multi_year_data_from_quotation(self)
+	"""before_save is the reliable hook; before_insert is kept for completeness but does not run copy."""
+	pass
 
 
 def before_save(self, method=None):
@@ -63,54 +63,55 @@ def copy_multi_year_data_from_quotation(self):
 	"""
 	When a Sales Order is created from a License Renewal Quotation, carry forward:
 	  - custom_quotation_type
-	  - custom_license_renewal_items (full child table)
 	  - Year 2 and Year 3 totals, taxes, and grand totals
 	"""
-	quotation_name = _find_source_quotation(self)
-
-	if not quotation_name:
-		return
-
 	try:
-		quotation = frappe.get_doc("Quotation", quotation_name)
-	except frappe.DoesNotExistError:
-		return
+		quotation_name = _find_source_quotation(self)
+		if not quotation_name:
+			return
 
-	# Only carry forward if this is a License Renewal quotation
-	if getattr(quotation, "custom_quotation_type", None) != "License Renewal":
-		return
+		try:
+			quotation = frappe.get_doc("Quotation", quotation_name)
+		except frappe.DoesNotExistError:
+			frappe.log_error(f"Sales Order copy: Quotation {quotation_name} not found", "SO Multi-year copy")
+			return
 
-	self.custom_quotation_type = quotation.custom_quotation_type
-	self.custom_total_year_2 = flt(quotation.custom_total_year_2)
-	self.custom_total_year_3 = flt(quotation.custom_total_year_3)
-	self.custom_total_taxes_and_charges_year_2 = flt(quotation.custom_total_taxes_and_charges_year_2)
-	self.custom_total_taxes_and_charges_year_3 = flt(quotation.custom_total_taxes_and_charges_year_3)
-	self.custom_grand_total_year_2 = flt(quotation.custom_grand_total_year_2)
-	self.custom_grand_total_year_3 = flt(quotation.custom_grand_total_year_3)
+		# Only carry forward if this is a License Renewal quotation
+		if getattr(quotation, "custom_quotation_type", None) != "License Renewal":
+			return
 
+		self.custom_quotation_type = quotation.custom_quotation_type
+		self.custom_total_year_2 = flt(quotation.custom_total_year_2)
+		self.custom_total_year_3 = flt(quotation.custom_total_year_3)
+		self.custom_total_taxes_and_charges_year_2 = flt(quotation.custom_total_taxes_and_charges_year_2)
+		self.custom_total_taxes_and_charges_year_3 = flt(quotation.custom_total_taxes_and_charges_year_3)
+		self.custom_grand_total_year_2 = flt(quotation.custom_grand_total_year_2)
+		self.custom_grand_total_year_3 = flt(quotation.custom_grand_total_year_3)
 
-	# --- Year 2 taxes child table ---
-	self.set("custom_sales_taxes_and_charges_year_2", [])
-	for tax in quotation.custom_sales_taxes_and_charges_year_2:
-		self.append("custom_sales_taxes_and_charges_year_2", {
-			"charge_type": tax.charge_type,
-			"row_id": tax.row_id,
-			"description": tax.description,
-			"account_head": tax.account_head,
-			"rate": flt(tax.rate),
-			"tax_amount": flt(tax.tax_amount),
-			"total": flt(tax.total),
-		})
+		# --- Year 2 taxes child table ---
+		self.set("custom_sales_taxes_and_charges_year_2", [])
+		for tax in quotation.custom_sales_taxes_and_charges_year_2:
+			self.append("custom_sales_taxes_and_charges_year_2", {
+				"charge_type": tax.charge_type,
+				"row_id": tax.row_id,
+				"description": tax.description,
+				"account_head": tax.account_head,
+				"rate": flt(tax.rate),
+				"tax_amount": flt(tax.tax_amount),
+				"total": flt(tax.total),
+			})
 
-	# --- Year 3 taxes child table ---
-	self.set("custom_sales_taxes_and_charges_year_3", [])
-	for tax in quotation.custom_sales_taxes_and_charges_year_3:
-		self.append("custom_sales_taxes_and_charges_year_3", {
-			"charge_type": tax.charge_type,
-			"row_id": tax.row_id,
-			"description": tax.description,
-			"account_head": tax.account_head,
-			"rate": flt(tax.rate),
-			"tax_amount": flt(tax.tax_amount),
-			"total": flt(tax.total),
-		})
+		# --- Year 3 taxes child table ---
+		self.set("custom_sales_taxes_and_charges_year_3", [])
+		for tax in quotation.custom_sales_taxes_and_charges_year_3:
+			self.append("custom_sales_taxes_and_charges_year_3", {
+				"charge_type": tax.charge_type,
+				"row_id": tax.row_id,
+				"description": tax.description,
+				"account_head": tax.account_head,
+				"rate": flt(tax.rate),
+				"tax_amount": flt(tax.tax_amount),
+				"total": flt(tax.total),
+			})
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Sales Order: multi-year copy from Quotation failed")

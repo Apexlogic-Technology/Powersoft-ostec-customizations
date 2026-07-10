@@ -7,21 +7,105 @@ def get_currency_precision():
 	precision = cint(frappe.db.get_default("currency_precision"))
 	return precision if precision else 2
 
+
 def before_save(self, method=None):
 	calcs(self)
 	copy_items_in_main_table(self)
 	self.run_method("set_missing_values")
 	self.run_method("calculate_taxes_and_totals")
-	
-	# ===== SAFETY NET: Ensure totals exactly match the custom items table (source of truth) =====
-	# Because calcs() now rounds each row to currency precision, the standard items table
-	# will carry the same values and ERPNext's calculate_taxes_and_totals should produce
-	# the same result. This block is kept as a final guard against any residual drift.
+	_apply_totals_safety_net(self)
+	calculate_custom_taxes_year_2(self)
+	calculate_custom_taxes_year_3(self)
+	self.custom_grand_total_year_2 = flt(self.custom_total_year_2) + flt(self.custom_total_taxes_and_charges_year_2)
+	self.custom_grand_total_year_3 = flt(self.custom_total_year_3) + flt(self.custom_total_taxes_and_charges_year_3)
+
+
+def validate(self, method=None):
+	"""
+	validate() runs on every Save AND on Submit (ERPNext always calls validate before submitting).
+	By running all calculations here, the safety-net now covers the submit path too.
+	"""
+	calcs(self)
+	copy_items_in_main_table(self)
+	_apply_totals_safety_net(self)
+	calculate_custom_taxes_year_2(self)
+	calculate_custom_taxes_year_3(self)
+	self.custom_grand_total_year_2 = flt(self.custom_total_year_2) + flt(self.custom_total_taxes_and_charges_year_2)
+	self.custom_grand_total_year_3 = flt(self.custom_total_year_3) + flt(self.custom_total_taxes_and_charges_year_3)
+
+
+def on_submit(self, method=None):
+	calcs(self)
+
+
+def calcs(self):
 	precision = get_currency_precision()
-	# conversion_rate converts document currency -> company base currency (e.g. USD -> GHS)
-	conversion_rate = flt(self.conversion_rate) if flt(self.conversion_rate) > 0 else 1.0
 	ch_tab_name = get_items_table_name(self)
 	if ch_tab_name:
+		for row in self.get(ch_tab_name, []):
+			markup = flt(row.markup) / 100
+			clearing = flt(row.clearing) / 100
+			# Protect against zero FX or zero qty
+			fx = flt(row.fx) if flt(row.fx) > 0 else 1
+			qty = flt(row.qty) if flt(row.qty) > 0 else 1
+			multiplier = (1 + markup) * fx
+			row.multiplier = multiplier
+			# Round all monetary results to currency precision to prevent float drift accumulation
+			row.disti_quote_total = flt((flt(row.disti_quote) + flt(row.shipping)) * qty, precision)
+			row.rate = flt(
+				flt(row.disti_quote) * multiplier * (1 + clearing)
+				+ flt(row.shipping) * multiplier * (1 + clearing),
+				precision
+			)
+			row.amount = flt(row.rate * qty, precision)
+
+
+def copy_items_in_main_table(self):
+	self.set('items', [])
+	ch_tab_name = get_items_table_name(self)
+	if ch_tab_name:
+		for row in self.get(ch_tab_name, []):
+			new_row = {}
+			new_row["item_code"] = row.get('main_item_code')
+			new_row["item_name"] = row.get('item_name')
+			new_row["custom_part_number"] = row.get('part_number')
+			new_row["custom_serial_no"] = row.get('custom_serial_no')
+			new_row["description"] = row.get('description')
+			new_row["qty"] = row.get('qty')
+			new_row["custom_disti_quote"] = row.get('disti_quote')
+			new_row["custom_disti_quote_total"] = row.get('disti_quote_total')
+			new_row["custom_multiplier"] = row.get('multiplier')
+			new_row["custom_shipping"] = row.get('shipping')
+			new_row["custom_markup"] = row.get('markup')
+			new_row["custom_fx"] = row.get('fx')
+			new_row["custom_clearing"] = row.get('clearing')
+			new_row["rate"] = row.get('rate')
+			new_row["amount"] = row.get('amount')
+			new_row["uom"] = row.get('uom')
+			self.append("items", new_row)
+
+
+def get_items_table_name(self):
+	ch_tab_name = None
+	if (self.custom_quotation_type == "Standard Quotation"):ch_tab_name = "custom_standard_quotation_items"
+	if (self.custom_quotation_type == "License Renewal"):ch_tab_name = "custom_license_renewal_items"
+	return ch_tab_name
+
+
+def _apply_totals_safety_net(self):
+	"""
+	Recalculate and overwrite all ERPNext totals from the custom items table (source of truth).
+	Called from validate() so it also runs during on_submit (ERPNext calls validate before submit).
+	Also called from before_save after calculate_taxes_and_totals for extra protection.
+	"""
+	try:
+		precision = get_currency_precision()
+		# conversion_rate converts document currency -> company base currency (e.g. USD -> GHS)
+		conversion_rate = flt(self.conversion_rate) if flt(self.conversion_rate) > 0 else 1.0
+		ch_tab_name = get_items_table_name(self)
+		if not ch_tab_name:
+			return
+
 		# Sum already-rounded amounts — result is exact
 		correct_total = flt(sum(flt(row.amount) for row in self.get(ch_tab_name, [])), precision)
 
@@ -60,141 +144,88 @@ def before_save(self, method=None):
 		# Set the correct grand total (base/company currency)
 		self.base_grand_total = flt(grand * conversion_rate, precision)
 		self.base_rounded_total = flt(round(grand * conversion_rate, 0), 0)
-	# ===== END SAFETY NET =====
 
-	
-	calculate_custom_taxes_year_2(self)
-	calculate_custom_taxes_year_3(self)
-	self.custom_grand_total_year_2 = flt(self.custom_total_year_2) + flt(self.custom_total_taxes_and_charges_year_2)
-	self.custom_grand_total_year_3 = flt(self.custom_total_year_3) + flt(self.custom_total_taxes_and_charges_year_3)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Quotation: totals safety-net failed")
 
-def validate(self, method=None):
-	calcs(self)
-
-def on_submit(self, method=None):
-	calcs(self)
-
-def calcs(self):
-	precision = get_currency_precision()
-	ch_tab_name = get_items_table_name(self)
-	if ch_tab_name:
-		for row in self.get(ch_tab_name, []):
-			markup = flt(row.markup) / 100
-			clearing = flt(row.clearing) / 100
-			# Protect against zero FX or zero qty
-			fx = flt(row.fx) if flt(row.fx) > 0 else 1
-			qty = flt(row.qty) if flt(row.qty) > 0 else 1
-			multiplier = (1 + markup) * fx
-			row.multiplier = multiplier
-			# Round all monetary results to currency precision to prevent float drift accumulation
-			row.disti_quote_total = flt((flt(row.disti_quote) + flt(row.shipping)) * qty, precision)
-			row.rate = flt(
-				flt(row.disti_quote) * multiplier * (1 + clearing)
-				+ flt(row.shipping) * multiplier * (1 + clearing),
-				precision
-			)
-			row.amount = flt(row.rate * qty, precision)
-
-def copy_items_in_main_table(self):
-	self.set('items', [])
-	ch_tab_name = get_items_table_name(self)
-	if ch_tab_name:
-		for row in self.get(ch_tab_name, []):
-			new_row = {}
-			new_row["item_code"] = row.get('main_item_code')
-			new_row["item_name"] = row.get('item_name')
-			new_row["custom_part_number"] = row.get('part_number')
-			new_row["custom_serial_no"] = row.get('custom_serial_no')
-			new_row["description"] = row.get('description')
-			new_row["qty"] = row.get('qty')
-			new_row["custom_disti_quote"] = row.get('disti_quote')
-			new_row["custom_disti_quote_total"] = row.get('disti_quote_total')
-			new_row["custom_multiplier"] = row.get('multiplier')
-			new_row["custom_shipping"] = row.get('shipping')
-			new_row["custom_markup"] = row.get('markup')
-			new_row["custom_fx"] = row.get('fx')
-			new_row["custom_clearing"] = row.get('clearing')
-			new_row["rate"] = row.get('rate')
-			new_row["amount"] = row.get('amount')
-			new_row["uom"] = row.get('uom')
-			self.append("items", new_row)
-
-def get_items_table_name(self):
-	ch_tab_name = None
-	if (self.custom_quotation_type == "Standard Quotation"):ch_tab_name = "custom_standard_quotation_items"
-	if (self.custom_quotation_type == "License Renewal"):ch_tab_name = "custom_license_renewal_items"
-	return ch_tab_name
 
 def calculate_custom_taxes_year_2(self):
-	precision = get_currency_precision()
-	total_amount = flt(sum(flt(item.year_total_2) for item in self.custom_license_renewal_items if item.year_total_2), precision)
-	total_tax = 0
-	total_with_tax = total_amount
-	self.custom_total_year_2 = total_amount
-	custom_sales_taxes_and_charges_year_2 = []
-	for tax in self.taxes:
-		if tax.charge_type == "Actual":
-			tax_amount = flt(tax.tax_amount, precision)
-		else:
-			tax_amount = flt((total_amount * flt(tax.rate)) / 100, precision)
-		total_tax = flt(total_tax + tax_amount, precision)
-		total_with_tax = flt(total_with_tax + tax_amount, precision)
-		custom_tax_row = {
-			'charge_type': tax.charge_type,
-			'row_id': tax.row_id,
-			'description': tax.description,
-			'account_head': tax.account_head,
-			'rate': tax.rate,
-			'tax_amount': tax_amount,
-			'total': total_with_tax
-		}
-		custom_sales_taxes_and_charges_year_2.append(custom_tax_row)
-	self.set('custom_sales_taxes_and_charges_year_2', [])
-	for custom_tax in custom_sales_taxes_and_charges_year_2:
-		self.append('custom_sales_taxes_and_charges_year_2', {
-			'charge_type': custom_tax['charge_type'],
-			'row_id': custom_tax['row_id'],
-			'description': custom_tax['description'],
-			'account_head': custom_tax['account_head'],
-			'rate': custom_tax['rate'],
-			'tax_amount': custom_tax['tax_amount'],
-			'total': custom_tax['total']
-		})
-	self.custom_total_taxes_and_charges_year_2 = total_tax
+	try:
+		precision = get_currency_precision()
+		total_amount = flt(sum(flt(item.year_total_2) for item in self.custom_license_renewal_items if item.year_total_2), precision)
+		total_tax = 0
+		total_with_tax = total_amount
+		self.custom_total_year_2 = total_amount
+		custom_sales_taxes_and_charges_year_2 = []
+		for tax in self.taxes:
+			if tax.charge_type == "Actual":
+				tax_amount = flt(tax.tax_amount, precision)
+			else:
+				tax_amount = flt((total_amount * flt(tax.rate)) / 100, precision)
+			total_tax = flt(total_tax + tax_amount, precision)
+			total_with_tax = flt(total_with_tax + tax_amount, precision)
+			custom_tax_row = {
+				'charge_type': tax.charge_type,
+				'row_id': tax.row_id,
+				'description': tax.description,
+				'account_head': tax.account_head,
+				'rate': tax.rate,
+				'tax_amount': tax_amount,
+				'total': total_with_tax
+			}
+			custom_sales_taxes_and_charges_year_2.append(custom_tax_row)
+		self.set('custom_sales_taxes_and_charges_year_2', [])
+		for custom_tax in custom_sales_taxes_and_charges_year_2:
+			self.append('custom_sales_taxes_and_charges_year_2', {
+				'charge_type': custom_tax['charge_type'],
+				'row_id': custom_tax['row_id'],
+				'description': custom_tax['description'],
+				'account_head': custom_tax['account_head'],
+				'rate': custom_tax['rate'],
+				'tax_amount': custom_tax['tax_amount'],
+				'total': custom_tax['total']
+			})
+		self.custom_total_taxes_and_charges_year_2 = total_tax
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Quotation: Year 2 tax calculation failed")
+
 
 def calculate_custom_taxes_year_3(self):
-	precision = get_currency_precision()
-	total_amount = flt(sum(flt(item.year_total_3) for item in self.custom_license_renewal_items if item.year_total_3), precision)
-	total_tax = 0
-	total_with_tax = total_amount
-	self.custom_total_year_3 = total_amount
-	custom_sales_taxes_and_charges_year_3 = []
-	for tax in self.taxes:
-		if tax.charge_type == "Actual":
-			tax_amount = flt(tax.tax_amount, precision)
-		else:
-			tax_amount = flt((total_amount * flt(tax.rate)) / 100, precision)
-		total_tax = flt(total_tax + tax_amount, precision)
-		total_with_tax = flt(total_with_tax + tax_amount, precision)
-		custom_tax_row = {
-			'charge_type': tax.charge_type,
-			'row_id': tax.row_id,
-			'description': tax.description,
-			'account_head': tax.account_head,
-			'rate': tax.rate,
-			'tax_amount': tax_amount,
-			'total': total_with_tax
-		}
-		custom_sales_taxes_and_charges_year_3.append(custom_tax_row)
-	self.set('custom_sales_taxes_and_charges_year_3', [])
-	for custom_tax in custom_sales_taxes_and_charges_year_3:
-		self.append('custom_sales_taxes_and_charges_year_3', {
-			'charge_type': custom_tax['charge_type'],
-			'row_id': custom_tax['row_id'],
-			'description': custom_tax['description'],
-			'account_head': custom_tax['account_head'],
-			'rate': custom_tax['rate'],
-			'tax_amount': custom_tax['tax_amount'],
-			'total': custom_tax['total']
-		})
-	self.custom_total_taxes_and_charges_year_3 = total_tax
+	try:
+		precision = get_currency_precision()
+		total_amount = flt(sum(flt(item.year_total_3) for item in self.custom_license_renewal_items if item.year_total_3), precision)
+		total_tax = 0
+		total_with_tax = total_amount
+		self.custom_total_year_3 = total_amount
+		custom_sales_taxes_and_charges_year_3 = []
+		for tax in self.taxes:
+			if tax.charge_type == "Actual":
+				tax_amount = flt(tax.tax_amount, precision)
+			else:
+				tax_amount = flt((total_amount * flt(tax.rate)) / 100, precision)
+			total_tax = flt(total_tax + tax_amount, precision)
+			total_with_tax = flt(total_with_tax + tax_amount, precision)
+			custom_tax_row = {
+				'charge_type': tax.charge_type,
+				'row_id': tax.row_id,
+				'description': tax.description,
+				'account_head': tax.account_head,
+				'rate': tax.rate,
+				'tax_amount': tax_amount,
+				'total': total_with_tax
+			}
+			custom_sales_taxes_and_charges_year_3.append(custom_tax_row)
+		self.set('custom_sales_taxes_and_charges_year_3', [])
+		for custom_tax in custom_sales_taxes_and_charges_year_3:
+			self.append('custom_sales_taxes_and_charges_year_3', {
+				'charge_type': custom_tax['charge_type'],
+				'row_id': custom_tax['row_id'],
+				'description': custom_tax['description'],
+				'account_head': custom_tax['account_head'],
+				'rate': custom_tax['rate'],
+				'tax_amount': custom_tax['tax_amount'],
+				'total': custom_tax['total']
+			})
+		self.custom_total_taxes_and_charges_year_3 = total_tax
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Quotation: Year 3 tax calculation failed")
