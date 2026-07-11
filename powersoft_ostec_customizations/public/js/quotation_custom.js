@@ -166,6 +166,8 @@ function calcs(frm) {
                 "rate" : row.rate,
                 "amount" : row.amount,
                 "uom" : row.uom || "Nos",
+                "conversion_factor" : 1.0,
+                "stock_qty" : row.qty,
             })
         }
         frm.refresh_field(ch_tab_name);
