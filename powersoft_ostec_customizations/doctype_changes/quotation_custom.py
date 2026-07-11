@@ -34,11 +34,12 @@ def before_save(self, method=None):
 
 def validate(self, method=None):
 	"""
-	validate() runs on every Save AND on Submit (ERPNext always calls validate before submitting).
-	By running all calculations here, the safety-net now covers the submit path too.
+	validate() runs on every Save AND on Submit.
+	Do NOT rebuild the items table here — that is done in before_save (Save)
+	and before_submit (Submit) so that ERPNext's own set_missing_values
+	cannot zero-out conversion_factor / stock_qty between our rebuild and
+	the mandatory-field check.
 	"""
-	calcs(self)
-	copy_items_in_main_table(self)
 	_apply_totals_safety_net(self)
 	calculate_custom_taxes_year_2(self)
 	calculate_custom_taxes_year_3(self)
@@ -51,12 +52,18 @@ def validate(self, method=None):
 
 
 def before_submit(self, method=None):
-	"""Runs just before ERPNext's mandatory-field check on submit.
-	Ensure stock_qty is populated so the submit validator passes.
 	"""
+	Rebuild the items table (same as before_save does for Save) so that
+	conversion_factor and stock_qty are present when ERPNext validates
+	mandatory fields on Submit.
+	"""
+	calcs(self)
+	copy_items_in_main_table(self)
+	# Unconditionally enforce conversion_factor and stock_qty — do not
+	# rely on the Item master having a UOM conversion defined.
 	for item in self.items:
-		if not flt(item.stock_qty):
-			item.stock_qty = flt(item.qty) * (flt(item.conversion_factor) or 1.0)
+		item.conversion_factor = flt(item.conversion_factor) or 1.0
+		item.stock_qty = flt(item.qty) * item.conversion_factor
 
 
 def on_submit(self, method=None):
