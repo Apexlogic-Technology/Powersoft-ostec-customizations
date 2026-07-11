@@ -44,6 +44,19 @@ def validate(self, method=None):
 	cannot zero-out conversion_factor / stock_qty between our rebuild and
 	the mandatory-field check.
 	"""
+	# --- DIAGNOSTIC: log item state BEFORE our changes ---
+	try:
+		debug_lines = [f"[VALIDATE] docstatus={self.docstatus} name={self.name}"]
+		for i, item in enumerate(self.items):
+			debug_lines.append(
+				f"  item[{i}] code={item.item_code} qty={item.qty} "
+				f"uom={item.uom} cf={item.conversion_factor} stock_qty={item.stock_qty}"
+			)
+		frappe.logger("quotation_debug").info("\n".join(debug_lines))
+	except Exception:
+		pass
+	# --- END DIAGNOSTIC ---
+
 	_apply_totals_safety_net(self)
 	calculate_custom_taxes_year_2(self)
 	calculate_custom_taxes_year_3(self)
@@ -53,12 +66,23 @@ def validate(self, method=None):
 	self.custom_grand_total_year_2 = flt(self.custom_total_year_2) + flt(self.custom_total_taxes_and_charges_year_2)
 	self.custom_grand_total_year_3 = flt(self.custom_total_year_3) + flt(self.custom_total_taxes_and_charges_year_3)
 	self.custom_grand_total_all_years = flt(self.grand_total) + flt(self.custom_grand_total_year_2) + flt(self.custom_grand_total_year_3)
-	# Our doc_events hook runs AFTER ERPNext's own Quotation.validate(), which may
-	# zero out conversion_factor via set_missing_values if UOM isn't in Item master.
-	# Enforce correct values here so validate_mandatory passes.
+	# Enforce correct values — our hook runs AFTER ERPNext's validate which may zero conversion_factor
 	for item in self.items:
 		item.conversion_factor = flt(item.conversion_factor) or 1.0
 		item.stock_qty = flt(item.qty) * item.conversion_factor
+
+	# --- DIAGNOSTIC: log item state AFTER our changes ---
+	try:
+		debug_lines2 = [f"[VALIDATE-AFTER] docstatus={self.docstatus}"]
+		for i, item in enumerate(self.items):
+			debug_lines2.append(
+				f"  item[{i}] code={item.item_code} qty={item.qty} "
+				f"uom={item.uom} cf={item.conversion_factor} stock_qty={item.stock_qty}"
+			)
+		frappe.logger("quotation_debug").info("\n".join(debug_lines2))
+	except Exception:
+		pass
+	# --- END DIAGNOSTIC ---
 
 
 def before_submit(self, method=None):
