@@ -168,6 +168,9 @@ function calcs(frm) {
                 "uom" : row.uom || "Nos",
                 "conversion_factor" : 1.0,
                 "stock_qty" : row.qty,
+                "ordered_qty" : 0.0,
+                "billed_amt" : 0.0,
+                "delivered_qty" : 0.0,
             })
         }
         frm.refresh_field(ch_tab_name);
