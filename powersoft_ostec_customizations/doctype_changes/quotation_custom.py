@@ -98,7 +98,7 @@ def copy_items_in_main_table(self):
 			new_row["rate"] = row.get('rate')
 			new_row["amount"] = row.get('amount')
 			new_row["uom"] = row.get('uom')
-			new_row["uom_conversion_factor"] = flt(row.get('uom_conversion_factor')) or 1.0
+			new_row["conversion_factor"] = flt(row.get('conversion_factor')) or 1.0
 			new_row["stock_qty"] = flt(row.get('qty')) or 0.0
 			self.append("items", new_row)
 
