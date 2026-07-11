@@ -11,6 +11,7 @@ frappe.ui.form.on("Sales Order", {
 });
 
 function toggle_totals(frm) {
+	frm.toggle_display("custom_quotation_type", false);
 	let is_renewal = (frm.doc.custom_quotation_type === "License Renewal");
 	
 	let standard_fields = [

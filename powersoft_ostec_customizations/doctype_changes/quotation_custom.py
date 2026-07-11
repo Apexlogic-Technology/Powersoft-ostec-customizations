@@ -232,7 +232,7 @@ def _apply_totals_safety_net(self):
 		self.base_rounded_total = flt(round(grand * conversion_rate, 0), 0)
 
 	except Exception:
-		frappe.log_error(frappe.get_traceback(), "Quotation: totals safety-net failed")
+		frappe.log_error(title="Quotation: totals safety-net failed", message=frappe.get_traceback())
 
 
 def calculate_custom_taxes_year_2(self):
@@ -273,7 +273,7 @@ def calculate_custom_taxes_year_2(self):
 			})
 		self.custom_total_taxes_and_charges_year_2 = total_tax
 	except Exception:
-		frappe.log_error(frappe.get_traceback(), "Quotation: Year 2 tax calculation failed")
+		frappe.log_error(title="Quotation: Year 2 tax calculation failed", message=frappe.get_traceback())
 
 
 def calculate_custom_taxes_year_3(self):
@@ -314,4 +314,4 @@ def calculate_custom_taxes_year_3(self):
 			})
 		self.custom_total_taxes_and_charges_year_3 = total_tax
 	except Exception:
-		frappe.log_error(frappe.get_traceback(), "Quotation: Year 3 tax calculation failed")
+		frappe.log_error(title="Quotation: Year 3 tax calculation failed", message=frappe.get_traceback())

@@ -58,7 +58,6 @@ def copy_multi_year_data_from_sales_order(self):
 		try:
 			sales_order = frappe.get_doc("Sales Order", sales_order_name)
 		except frappe.DoesNotExistError:
-			frappe.log_error(f"Sales Invoice copy: Sales Order {sales_order_name} not found", "SI Multi-year copy")
 			return
 
 		# Only carry forward if this is a License Renewal
@@ -101,4 +100,4 @@ def copy_multi_year_data_from_sales_order(self):
 				"total": flt(tax.total),
 			})
 	except Exception:
-		frappe.log_error(frappe.get_traceback(), "Sales Invoice: multi-year copy from Sales Order failed")
+		frappe.log_error(title="Sales Invoice: multi-year copy from Sales Order failed", message=frappe.get_traceback())

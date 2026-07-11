@@ -43,7 +43,6 @@ def copy_multi_year_data_from_sales_invoice(self):
 		try:
 			sales_invoice = frappe.get_doc("Sales Invoice", sales_invoice_name)
 		except frappe.DoesNotExistError:
-			frappe.log_error(f"Payment Entry copy: Sales Invoice {sales_invoice_name} not found", "PE Multi-year copy")
 			return
 
 		# Only carry forward if this is a License Renewal
@@ -85,4 +84,4 @@ def copy_multi_year_data_from_sales_invoice(self):
 				"total": flt(tax.total),
 			})
 	except Exception:
-		frappe.log_error(frappe.get_traceback(), "Payment Entry: multi-year copy from Sales Invoice failed")
+		frappe.log_error(title="Payment Entry: multi-year copy from Sales Invoice failed", message=frappe.get_traceback())

@@ -27,13 +27,6 @@ def before_save(self, method=None):
 	Guarded so it only runs when the doc is new and the totals are not yet populated,
 	preventing redundant re-copy on subsequent saves of an existing Sales Order.
 	"""
-	try:
-		# Log to DB for visibility
-		msg = f"SO before_save: is_new={self.is_new()}, Year 2 Total={self.custom_grand_total_year_2}, Year 3 Total={self.custom_grand_total_year_3}"
-		frappe.log_error(msg, "SO before_save debug")
-	except Exception:
-		pass
-
 	if self.is_new() and not self.get("custom_sales_taxes_and_charges_year_2"):
 		quotation_name = _find_source_quotation(self)
 		if quotation_name:
@@ -53,15 +46,6 @@ def _find_source_quotation(self):
 	We verify by checking DB existence directly instead of relying on prevdoc_doctype.
 	Returns the Quotation name (string) or None if not found.
 	"""
-	try:
-		# Log fields on first item for debugging
-		if self.items:
-			first = self.items[0]
-			fields = {k: v for k, v in first.as_dict().items() if v}
-			frappe.log_error(f"First item fields: {fields}", "SO item fields debug")
-	except Exception:
-		pass
-
 	# Primary: prevdoc_docname — present in all ERPNext versions, verified via DB
 	for item in self.items:
 		val = getattr(item, "prevdoc_docname", None)
@@ -96,19 +80,15 @@ def copy_multi_year_data_from_quotation(self):
 	try:
 		quotation_name = _find_source_quotation(self)
 		if not quotation_name:
-			frappe.log_error("Could not find source quotation", "SO copy: no source")
 			return
 
 		try:
 			quotation = frappe.get_doc("Quotation", quotation_name)
 		except frappe.DoesNotExistError:
-			frappe.log_error(f"Quotation {quotation_name} not found in DB", "SO copy: missing doc")
 			return
 
 		# Only carry forward if this is a License Renewal quotation
 		qtype = getattr(quotation, "custom_quotation_type", None)
-		frappe.log_error(f"Source Quotation: {quotation_name}, type={qtype}", "SO copy: quotation type")
-		
 		if qtype != "License Renewal":
 			return
 
@@ -146,7 +126,5 @@ def copy_multi_year_data_from_quotation(self):
 				"tax_amount": flt(tax.tax_amount),
 				"total": flt(tax.total),
 			})
-		
-		frappe.log_error(f"Copy successful! type={self.custom_quotation_type}, Y2 total={self.custom_grand_total_year_2}", "SO copy: success")
 	except Exception:
-		frappe.log_error(frappe.get_traceback(), "Sales Order: multi-year copy from Quotation failed")
+		frappe.log_error(title="Sales Order: multi-year copy from Quotation failed", message=frappe.get_traceback())
