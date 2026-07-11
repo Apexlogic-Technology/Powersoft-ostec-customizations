@@ -34,7 +34,7 @@ def before_save(self, method=None):
 	except Exception:
 		pass
 
-	if self.is_new() and not flt(self.custom_grand_total_year_2) and not flt(self.custom_grand_total_year_3):
+	if self.is_new() and not self.get("custom_sales_taxes_and_charges_year_2"):
 		quotation_name = _find_source_quotation(self)
 		if quotation_name:
 			copy_multi_year_data_from_quotation(self)

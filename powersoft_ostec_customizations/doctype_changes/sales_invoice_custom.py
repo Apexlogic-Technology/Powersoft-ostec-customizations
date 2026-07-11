@@ -27,7 +27,7 @@ def before_save(self, method=None):
 	Guarded so it only runs when the doc is new and the totals are not yet populated,
 	preventing redundant re-copy on subsequent saves of an existing Sales Invoice.
 	"""
-	if self.is_new() and not flt(self.custom_grand_total_year_2) and not flt(self.custom_grand_total_year_3):
+	if self.is_new() and not self.get("custom_sales_taxes_and_charges_year_2"):
 		copy_multi_year_data_from_sales_order(self)
 
 	if getattr(self, "custom_quotation_type", None) == "License Renewal":
