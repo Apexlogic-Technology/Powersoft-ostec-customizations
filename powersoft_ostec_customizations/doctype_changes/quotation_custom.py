@@ -30,6 +30,10 @@ def before_save(self, method=None):
 	self.custom_grand_total_year_2 = flt(self.custom_total_year_2) + flt(self.custom_total_taxes_and_charges_year_2)
 	self.custom_grand_total_year_3 = flt(self.custom_total_year_3) + flt(self.custom_total_taxes_and_charges_year_3)
 	self.custom_grand_total_all_years = flt(self.grand_total) + flt(self.custom_grand_total_year_2) + flt(self.custom_grand_total_year_3)
+	# Ensure items have valid conversion_factor and stock_qty regardless of Item master UOM setup
+	for item in self.items:
+		item.conversion_factor = flt(item.conversion_factor) or 1.0
+		item.stock_qty = flt(item.qty) * item.conversion_factor
 
 
 def validate(self, method=None):
@@ -49,6 +53,12 @@ def validate(self, method=None):
 	self.custom_grand_total_year_2 = flt(self.custom_total_year_2) + flt(self.custom_total_taxes_and_charges_year_2)
 	self.custom_grand_total_year_3 = flt(self.custom_total_year_3) + flt(self.custom_total_taxes_and_charges_year_3)
 	self.custom_grand_total_all_years = flt(self.grand_total) + flt(self.custom_grand_total_year_2) + flt(self.custom_grand_total_year_3)
+	# Our doc_events hook runs AFTER ERPNext's own Quotation.validate(), which may
+	# zero out conversion_factor via set_missing_values if UOM isn't in Item master.
+	# Enforce correct values here so validate_mandatory passes.
+	for item in self.items:
+		item.conversion_factor = flt(item.conversion_factor) or 1.0
+		item.stock_qty = flt(item.qty) * item.conversion_factor
 
 
 def before_submit(self, method=None):
