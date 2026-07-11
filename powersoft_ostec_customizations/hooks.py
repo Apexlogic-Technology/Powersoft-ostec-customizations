@@ -137,6 +137,7 @@ doc_events = {
         "onload": "powersoft_ostec_customizations.doctype_changes.quotation_custom.onload",
         "before_save": "powersoft_ostec_customizations.doctype_changes.quotation_custom.before_save",
         "validate": "powersoft_ostec_customizations.doctype_changes.quotation_custom.validate",
+        "before_submit": "powersoft_ostec_customizations.doctype_changes.quotation_custom.before_submit",
         "on_submit": "powersoft_ostec_customizations.doctype_changes.quotation_custom.on_submit",
     },
     # Copy multi-year license renewal data from the Quotation into the Sales Order on creation

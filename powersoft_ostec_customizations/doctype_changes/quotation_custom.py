@@ -50,6 +50,15 @@ def validate(self, method=None):
 	self.custom_grand_total_all_years = flt(self.grand_total) + flt(self.custom_grand_total_year_2) + flt(self.custom_grand_total_year_3)
 
 
+def before_submit(self, method=None):
+	"""Runs just before ERPNext's mandatory-field check on submit.
+	Ensure stock_qty is populated so the submit validator passes.
+	"""
+	for item in self.items:
+		if not flt(item.stock_qty):
+			item.stock_qty = flt(item.qty) * (flt(item.conversion_factor) or 1.0)
+
+
 def on_submit(self, method=None):
 	calcs(self)
 
@@ -100,7 +109,10 @@ def copy_items_in_main_table(self):
 			new_row["uom"] = row.get('uom')
 			new_row["conversion_factor"] = flt(row.get('conversion_factor')) or 1.0
 			new_row["stock_qty"] = flt(row.get('qty')) or 0.0
-			self.append("items", new_row)
+			# Set stock_qty on the object directly so the ORM cannot silently drop it
+			appended = self.append("items", new_row)
+			appended.stock_qty = flt(row.get('qty')) or 0.0
+			appended.conversion_factor = flt(row.get('conversion_factor')) or 1.0
 
 
 def get_items_table_name(self):
